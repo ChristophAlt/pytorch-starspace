@@ -47,7 +47,7 @@ class InnerProductSimilarity(nn.Module):
 
 
 class StarSpace(nn.Module):
-    def __init__(self, dim, n_input, n_output, similarity, max_norm=10, aggregate=torch.sum):
+    def __init__(self, d_embed, n_input, n_output, similarity, max_norm=10, aggregate=torch.sum):
         super(StarSpace, self).__init__()
 
         self.n_input = n_input
@@ -55,8 +55,8 @@ class StarSpace(nn.Module):
         self.similarity = similarity
         self.aggregate = aggregate
         
-        self.input_embedding = nn.Embedding(n_input, dim, max_norm=max_norm)
-        self.output_embedding = nn.Embedding(n_output, dim, max_norm=max_norm)
+        self.input_embedding = nn.Embedding(n_input, d_embed, max_norm=max_norm)
+        self.output_embedding = nn.Embedding(n_output, d_embed, max_norm=max_norm)
 
     def forward(self, input, output=None):
         if input.dim() == 1:
@@ -74,23 +74,3 @@ class StarSpace(nn.Module):
             return input_repr, output_repr
         
         return input_repr,
-
-    #def predict(self, batch):
-    #    input = batch.text # B x L
-    #    
-    #    batch_size = input.size(0)
-    #    
-    #    output = torch.autograd.Variable(torch.range(0, self.n_output - 1).long().expand(batch_size, -1)) # B x d_output
-    #    
-    #    if input.is_cuda:
-    #        output = output.cuda()
-    #    
-    #    input_emb = self.input_embedding(input) # B x L x dim
-    #    output_emb = self.output_embedding(output) # B x d_output x dim
-    #    input_repr = self.aggregate_f(input_emb, dim=1) # B x dim
-    #    output_repr = output_emb # B x d_output x dim
-    #    
-    #    if self.similarity == 'dot':
-    #        similarity = torch.bmm(output_repr, input_repr.unsqueeze(dim=-1)).squeeze(dim=-1)
-    #        
-    #    return similarity.max(dim=-1)[1]

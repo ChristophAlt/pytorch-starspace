@@ -2,4 +2,4 @@ torchtext
 numpy
 spacy
 six
-
+tabulate

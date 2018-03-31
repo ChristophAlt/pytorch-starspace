@@ -1,9 +1,33 @@
 import random
 import os
 
+from tabulate import tabulate
 from torchtext.data import Dataset
 
 from argparse import ArgumentParser
+
+
+class TableLogger(object):
+    def __init__(self, headers):
+        self.headers = headers
+        self.header_logged = False
+        self.tabular_data = []
+        self.tablefmt = 'simple'
+        
+    def _align_entries(self, entries):
+        dct = dict(entries)
+        aligned = [dct.get(h, None) for h in self.headers]
+        return aligned
+        
+    def log(self, *entries):
+        tabular_data = self._align_entries(entries)
+        self.tabular_data.append(tabular_data)
+        table = tabulate(self.tabular_data, headers=self.headers, tablefmt=self.tablefmt)
+        if self.header_logged:
+            table = table.rsplit('\n', 2)[-1]
+        else:
+            self.header_logged = True
+        print(table)
 
 
 def get_args():
@@ -15,7 +39,7 @@ def get_args():
     parser.add_argument('--n_negative', type=int, default=5)
     parser.add_argument('--log_every', type=int, default=50)
     parser.add_argument('--lr', type=float, default=1e-3)
-    parser.add_argument('--dev_every', type=int, default=1000)
+    parser.add_argument('--val_every', type=int, default=1000)
     parser.add_argument('--save_every', type=int, default=1000)
     parser.add_argument('--gpu', type=int, default=0)
     parser.add_argument('--save_path', type=str, default='results')
