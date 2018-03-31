@@ -35,7 +35,6 @@ def get_args():
     parser.add_argument('--epochs', type=int, default=10)
     parser.add_argument('--batch_size', type=int, default=64)
     parser.add_argument('--d_embed', type=int, default=100)
-    parser.add_argument('--max_vocab_size', type=int, default=100000)
     parser.add_argument('--n_negative', type=int, default=5)
     parser.add_argument('--log_every', type=int, default=50)
     parser.add_argument('--lr', type=float, default=1e-3)

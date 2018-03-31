@@ -58,12 +58,15 @@ class StarSpace(nn.Module):
         self.input_embedding = nn.Embedding(n_input, d_embed, max_norm=max_norm)
         self.output_embedding = nn.Embedding(n_output, d_embed, max_norm=max_norm)
 
-    def forward(self, input, output=None):
-        if input.dim() == 1:
-            input = input.unsqueeze(-1)
+    def forward(self, input=None, output=None):
+        input_repr, output_repr = None, None
+        
+        if input is not None:
+            if input.dim() == 1:
+                input = input.unsqueeze(-1)
 
-        input_emb = self.input_embedding(input)  # B x L_i x dim
-        input_repr = self.aggregate(input_emb, dim=1)  # B x dim
+            input_emb = self.input_embedding(input)  # B x L_i x dim
+            input_repr = self.aggregate(input_emb, dim=1)  # B x dim
         
         if output is not None:
             if output.dim() == 1:
@@ -71,6 +74,5 @@ class StarSpace(nn.Module):
 
             output_emb = self.output_embedding(output)  # B x L_o x dim
             output_repr = self.aggregate(output_emb, dim=1)  # B x dim
-            return input_repr, output_repr
         
-        return input_repr,
+        return input_repr, output_repr

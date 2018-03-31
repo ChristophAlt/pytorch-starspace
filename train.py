@@ -36,7 +36,7 @@ def main():
     print('N samples validation:', len(validation))
     print('N samples test:', len(test))
 
-    TEXT.build_vocab(train, max_size=args.max_vocab_size)
+    TEXT.build_vocab(train)
     LABEL.build_vocab(train)
 
     print('Vocab size TEXT:', len(TEXT.vocab))
@@ -61,7 +61,7 @@ def main():
     criterion = MarginRankingLoss(margin=1., aggregate=torch.mean)
     opt = torch.optim.Adam(model.parameters(), lr=args.lr)
 
-    logger = TableLogger(headers=['time', 'epoch', 'iterations', 'loss', 'val_loss', 'accuracy', 'val_accuracy'])
+    logger = TableLogger(headers=['time', 'epoch', 'iterations', 'loss', 'accuracy', 'val_accuracy'])
     
     makedirs(args.save_path)
     
@@ -92,7 +92,7 @@ def main():
             neg_output = neg_sampling.sample(n_samples)
             if batch.text.is_cuda:
                 neg_output = neg_output.cuda()
-            input_repr, neg_output_repr = model(batch.text, neg_output)  # B x dim, (B * n_negative) x dim
+            _, neg_output_repr = model(output=neg_output)  # (B * n_negative) x dim
             neg_output_repr = neg_output_repr.view(batch.batch_size, args.n_negative, -1)  # B x n_negative x dim
             negative_similarity = model.similarity(input_repr, neg_output_repr).squeeze(1)  # B x n_negative
 
@@ -100,7 +100,7 @@ def main():
             output = torch.autograd.Variable(torch.arange(0, len(LABEL.vocab)).long().expand(batch.batch_size, -1)) # B x n_output
             if batch.text.is_cuda:
                 output = output.cuda()
-            input_repr, output_repr = model(batch.text, output.view(batch.batch_size * len(LABEL.vocab)))  # B x dim, (B * n_output) x dim
+            _, output_repr = model(output=output.view(batch.batch_size * len(LABEL.vocab)))  # B x dim, (B * n_output) x dim
             output_repr = output_repr.view(batch.batch_size, len(LABEL.vocab), -1)  # B x n_output x dim
             similarity = model.similarity(input_repr, output_repr).squeeze(1)  # B x n_output
             n_correct += (torch.max(similarity, dim=-1)[1].view(batch.label.size()).data == batch.label.data).sum()
