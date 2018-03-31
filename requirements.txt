@@ -1,1 +1,5 @@
 torchtext
+numpy
+spacy
+six
+

@@ -1,10 +1,14 @@
+import os
+import time
+import glob
 import torch
 
+from pathlib import Path
 from torchtext import data
 
-from .model import StarSpace, NegativeSampling, InnerProductSimilarity, MarginRankingLoss
-from .ag_news_corpus import AGNewsCorpus
-from .utils import get_args, train_validation_split
+from model import StarSpace, NegativeSampling, InnerProductSimilarity, MarginRankingLoss
+from ag_news_corpus import AGNewsCorpus
+from utils import get_args, train_validation_split, makedirs
 
 
 TORCHTEXT_DIR = os.path.join(str(Path.home()), '.torchtext')
@@ -12,6 +16,10 @@ TORCHTEXT_DIR = os.path.join(str(Path.home()), '.torchtext')
 
 def main():
     args = get_args()
+
+    print('Configuration:')
+    print(vars(args))
+
     torch.cuda.set_device(args.gpu)
 
     TEXT = data.Field(batch_first=True, include_lengths=False,
@@ -24,12 +32,12 @@ def main():
 
     train, validation = train_validation_split(train_validation, train_size=0.9)
 
-    print('N samples train:', len(train_dataset))
-    print('N samples validation:', len(val_dataset))
-    print('N samples test:', len(test_dataset))
+    print('N samples train:', len(train))
+    print('N samples validation:', len(validation))
+    print('N samples test:', len(test))
 
-    TEXT.build_vocab(train_dataset, max_size=args.max_vocab_size)
-    LABEL.build_vocab(train_dataset)
+    TEXT.build_vocab(train, max_size=args.max_vocab_size)
+    LABEL.build_vocab(train)
 
     print('Vocab size TEXT:', len(TEXT.vocab))
     print('Vocab size LABEL:', len(LABEL.vocab))
@@ -44,6 +52,9 @@ def main():
         similarity=InnerProductSimilarity(),
         max_norm=20,
         aggregate=torch.sum)
+
+    # implement loading from snapshot
+    model.cuda()
 
     neg_sampling = NegativeSampling(n_output=len(LABEL.vocab), n_negative=args.n_negative)
 
@@ -61,7 +72,6 @@ def main():
     print(header)
 
     for epoch in range(args.epochs):
-
         n_correct, n_total = 0, 0
         for batch_idx, batch in enumerate(train_iter):
 
@@ -76,16 +86,26 @@ def main():
             positive_similarity = model.similarity(input_repr, pos_output_repr).squeeze(1)  # B x 1
 
             # get similarity for negative entity pairs
-            batch_size = input.size(0)
-            n_samples = batch_size * args.n_negative
+            n_samples = batch.batch_size * args.n_negative
 
-            input_repr, neg_output_repr = model(batch.text, neg_sampling.sample(n_samples))  # B x dim, (B * n_negative) x dim
-            neg_output_repr = neg_output_repr.view(batch_size, args.n_negative, -1)  # B x n_negative x dim
+            neg_output = neg_sampling.sample(n_samples)
+            if batch.text.is_cuda:
+                neg_output = neg_output.cuda()
+
+            input_repr, neg_output_repr = model(batch.text, neg_output)  # B x dim, (B * n_negative) x dim
+            neg_output_repr = neg_output_repr.view(batch.batch_size, args.n_negative, -1)  # B x n_negative x dim
 
             negative_similarity = model.similarity(input_repr, neg_output_repr).squeeze(1)  # B x n_negative
 
             # calculate accuracy of predictions in the current batch
-            n_correct += (torch.max(answer, 1)[1].view(batch.label.size()).data == batch.label.data).sum()
+            output = torch.autograd.Variable(torch.range(0, len(LABEL.vocab) - 1).long().expand(batch.batch_size, -1)) # B x n_output
+            if batch.text.is_cuda:
+                output = output.cuda()
+            input_repr, output_repr = model(batch.text, output.view(batch.batch_size * len(LABEL.vocab)))  # B x dim, (B * n_output) x dim
+            output_repr = output_repr.view(batch.batch_size, len(LABEL.vocab), -1)  # B x n_output x dim
+            similarity = model.similarity(input_repr, output_repr).squeeze(1)  # B x n_output
+            #print(output_repr.size())
+            n_correct += (torch.max(similarity, dim=-1)[1].view(batch.label.size()).data == batch.label.data).sum()
             n_total += batch.batch_size
             train_acc = 100. * n_correct/n_total
 
@@ -110,12 +130,14 @@ def main():
                 # calculate accuracy on validation set
                 n_dev_correct = 0
                 for dev_batch_idx, dev_batch in enumerate(dev_iter):
-                    batch_size = dev_batch.batch_size
-                    output = torch.autograd.Variable(torch.range(0, len(LABEL.vocab) - 1).long().expand(batch_size, -1)) # B x n_output
-                    input_repr, output_repr = model(dev_batch.text, output)  # B x dim, B x n_output x dim
+                    output = torch.autograd.Variable(torch.range(0, len(LABEL.vocab) - 1).long().expand(dev_batch.batch_size, -1)) # B x n_output
+                    if dev_batch.text.is_cuda:
+                        output = output.cuda()
+                    input_repr, output_repr = model(dev_batch.text, output.view(dev_batch.batch_size * len(LABEL.vocab)))  # B x dim, (B * n_output) x dim
+                    output_repr = output_repr.view(dev_batch.batch_size, len(LABEL.vocab), -1)  # B x n_output x dim
                     similarity = model.similarity(input_repr, output_repr).squeeze(1)  # B x n_output
                     n_dev_correct += (torch.max(similarity, dim=-1)[1].view(dev_batch.label.size()).data == dev_batch.label.data).sum()
-                dev_acc = 100. * n_dev_correct / len(dev)
+                dev_acc = 100. * n_dev_correct / len(validation)
 
                 print(dev_log_template.format(time.time()-start,
                     epoch, iterations, 1+batch_idx, len(train_iter),
@@ -147,9 +169,11 @@ def main():
     # calculate accuracy on test set
     n_test_correct = 0
     for test_batch_idx, test_batch in enumerate(test_iter):
-        batch_size = test_batch.batch_size
-        output = torch.autograd.Variable(torch.range(0, len(LABEL.vocab) - 1).long().expand(batch_size, -1)) # B x n_output
-        input_repr, output_repr = model(test_batch.text, output)  # B x dim, B x n_output x dim
+        output = torch.autograd.Variable(torch.range(0, len(LABEL.vocab) - 1).long().expand(test_batch.batch_size, -1)) # B x n_output
+        if test_batch.text.is_cuda:
+            output = output.cuda()
+        input_repr, output_repr = model(test_batch.text, output.view(test_batch.batch_size * len(LABEL.vocab)))  # B x dim, (B * n_output) x dim
+        output_repr = output_repr.view(test_batch.batch_size, len(LABEL.vocab), -1)  # B x n_output x dim
         similarity = model.similarity(input_repr, output_repr).squeeze(1)  # B x n_output
         n_test_correct += (torch.max(similarity, dim=-1)[1].view(test_batch.label.size()).data == test_batch.label.data).sum()
         #test_loss = criterion(answer, dev_batch.label)

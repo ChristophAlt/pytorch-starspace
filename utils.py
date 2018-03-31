@@ -1,4 +1,5 @@
 import random
+import os
 
 from torchtext.data import Dataset
 
@@ -22,6 +23,22 @@ def get_args():
     args = parser.parse_args()
     return args
 
+def makedirs(name):
+    """helper function for python 2 and 3 to call os.makedirs()
+       avoiding an error if the directory to be created already exists"""
+
+    import os, errno
+
+    try:
+        os.makedirs(name)
+    except OSError as ex:
+        if ex.errno == errno.EEXIST and os.path.isdir(name):
+            # ignore existing directory
+            pass
+        else:
+            # a different error happened
+            raise
+
 def train_validation_split(dataset, train_size, shuffle=True):
     examples = list(dataset.examples)
     
@@ -37,14 +54,3 @@ def train_validation_split(dataset, train_size, shuffle=True):
     val_dataset.sort_key = dataset.sort_key
     
     return train_dataset, val_dataset
-
-def evaluate_on_test(model, dataset, batch_size=128):
-    model.eval()
-    n_correct, n_total = 0, 0
-    for batch_idx, batch in enumerate(
-            BucketIterator(dataset, batch_size, train=False)):
-        predictions = model.predict(batch)
-        #predictions = output[Port.PREDICTION]
-        accuracy(predictions, batch.label)
-
-    print('Test accuracy:', 100. * n_correct / n_total)

@@ -60,7 +60,7 @@ class StarSpace(nn.Module):
 
     def forward(self, input, output=None):
         if input.dim() == 1:
-            input = input.unsqueeze(-1)  # B x L_i
+            input = input.unsqueeze(-1)
 
         input_emb = self.input_embedding(input)  # B x L_i x dim
         input_repr = self.aggregate(input_emb, dim=1)  # B x dim
