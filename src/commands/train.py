@@ -10,7 +10,7 @@ from torchtext import data
 from src.model import StarSpace, InnerProductSimilarity, MarginRankingLoss
 from src.sampling import NegativeSampling
 from src.logging import TableLogger
-from src.utils import train_validation_split, makedirs, get_fields, get_dataset_extractor, serialize_fields
+from src.utils import train_validation_split, makedirs, get_fields, get_dataset_extractor, serialize_field_vocabs
 
 from datasets.ag_news_corpus import AGNewsCorpus
 
@@ -169,7 +169,7 @@ def train(train_file, dataset_format, epochs, batch_size, d_embed, n_negative, l
                         if f != snapshot_path:
                             os.remove(f)
 
-                    serialize_fields(snapshot_path, lhs_field, rhs_field)
+                    serialize_field_vocabs(snapshot_path, lhs_field, rhs_field)
 
             elif iterations % log_every == 0:
                 # log training progress

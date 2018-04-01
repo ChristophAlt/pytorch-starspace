@@ -2,7 +2,8 @@ import random
 import os
 import pickle
 
-from torchtext.data import Dataset
+from torchtext import data
+from datasets.ag_news_corpus import AGNewsCorpus
 
 
 def makedirs(name):
@@ -31,7 +32,7 @@ def train_validation_split(dataset, train_size, shuffle=True):
     split_idx = int(train_size * len(examples))
     train_examples, val_examples = examples[:split_idx], examples[split_idx:]
     
-    train_dataset, val_dataset = Dataset(train_examples, dataset.fields), Dataset(val_examples, dataset.fields)
+    train_dataset, val_dataset = data.Dataset(train_examples, dataset.fields), data.Dataset(val_examples, dataset.fields)
     
     train_dataset.sort_key = dataset.sort_key
     val_dataset.sort_key = dataset.sort_key
@@ -64,25 +65,25 @@ def get_dataset_extractor(path, dataset_format, lhs_field, rhs_field):
 
     return dataset, extractor_func
 
-def serialize_fields(model_path, lhs_field, rhs_field):
+def serialize_field_vocabs(model_path, lhs_field, rhs_field):
     idx = model_path.find('model.pt')
     path = model_path[:idx]
 
-    with open(path + '_lhs_field.pkl', 'wb') as f:
-        pickle.dump(lhs_field, f)
+    with open(path + '_lhs_vocab.pkl', 'wb') as f:
+        pickle.dump(lhs_field.vocab, f)
 
-    with open(path + '_rhs_field.pkl', 'wb') as f:
-        pickle.dump(rhs_field, f)
+    with open(path + '_rhs_vocab.pkl', 'wb') as f:
+        pickle.dump(rhs_field.vocab, f)
 
-def deserialize_fields(model_path):
+def deserialize_field_vocabs(model_path):
     idx = model_path.find('model.pt')
     path = model_path[:idx]
 
-    with open(path + '_lhs_field.pkl', 'rb') as f:
-        lhs_field = pickle.load(f)
+    with open(path + '_lhs_vocab.pkl', 'rb') as f:
+        lhs_vocab = pickle.load(f)
 
-    with open(path + '_rhs_field.pkl', 'rb') as f:
-        rhs_field = pickle.load(f)
+    with open(path + '_rhs_vocab.pkl', 'rb') as f:
+        rhs_vocab = pickle.load(f)
 
-    return lhs_field, rhs_field
+    return lhs_vocab, rhs_vocab
 
