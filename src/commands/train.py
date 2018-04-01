@@ -9,7 +9,8 @@ from torchtext import data
 
 from src.model import StarSpace, InnerProductSimilarity, MarginRankingLoss
 from src.sampling import NegativeSampling
-from src.utils import TableLogger, train_validation_split, makedirs
+from src.logging import TableLogger
+from src.utils import train_validation_split, makedirs
 
 from datasets.ag_news_corpus import AGNewsCorpus
 
@@ -20,14 +21,14 @@ def get_batch_attribs(lhs_attr_name, rhs_attr_name):
     return func
 
       
-def get_dataset(path, dataset_format):
-    if dataset == 'ag_news':
+def get_dataset_fields_extractor(path, dataset_format):
+    if dataset_format == 'ag_news':
         lhs_field = data.Field(batch_first=True, sequential=True, include_lengths=False, unk_token=None)
         rhs_field = data.Field(sequential=False, unk_token=None)
         dataset = AGNewsCorpus(path, text_field=lhs_field, label_field=rhs_field)
         extractor_func = get_batch_attribs('text', 'label')
     else:
-        raise NotImplementedError('Dataset format not supported yet!')
+        raise NotImplementedError("Dataset format '%s' not supported yet!" % dataset_format)
 
     return dataset, lhs_field, rhs_field, extractor_func
 
@@ -46,25 +47,17 @@ def get_dataset(path, dataset_format):
 @click.option('--save_every', type=int, default=1000)
 @click.option('--gpu', type=int, default=0)
 @click.option('--save_path', type=str, default='results')
-def train(train_file, dataset_format, epochs, batch_size, d_embed, n_negative, log_every, lr, val_every,
-    save_every, gpu, save_path, validation_split):
+def train(train_file, dataset_format, epochs, batch_size, d_embed, n_negative, log_every, lr, val_every, save_every, gpu, save_path, validation_split):
     #print('Configuration:')
 
     torch.cuda.device(gpu)
 
-    #TEXT = data.Field(batch_first=True, sequential=True, include_lengths=False, unk_token=None)
-    #LABEL = data.Field(batch_first=True, sequential=True, include_lengths=False, unk_token=None)
-    train_dataset, lhs_field, rhs_field, extractor_func = get_dataset(train_file, dataset_format)
-
-    #train_validation, test = AGNewsCorpus.splits(
-    #    root=os.path.join(TORCHTEXT_DIR, 'data'),
-    #    text_field=TEXT, label_field=LABEL)
+    train_dataset, lhs_field, rhs_field, extractor_func = get_dataset_fields_extractor(train_file, dataset_format)
 
     train, validation = train_validation_split(train_dataset, train_size=(1. - validation_split))
 
-    print('Num samples train:', len(train))
-    print('Num samples validation:', len(validation))
-    #print('N samples test:', len(test))
+    print('Num entity pairs train:', len(train))
+    print('Num entity pairs validation:', len(validation))
 
     lhs_field.build_vocab(train)
     rhs_field.build_vocab(train)
@@ -75,8 +68,8 @@ def train(train_file, dataset_format, epochs, batch_size, d_embed, n_negative, l
     print('Num LHS features:', n_lhs)
     print('Num RHS features:', n_rhs)
 
-    #train_iter, val_iter, test_iter = data.BucketIterator.splits(
-    #        (train, validation, test), batch_size=batch_size, device=gpu)
+    train_iter, val_iter = data.BucketIterator.splits(
+            (train, validation), batch_size=batch_size, device=gpu)
 
     model = StarSpace(
         d_embed=d_embed,
@@ -171,13 +164,13 @@ def train(train_file, dataset_format, epochs, batch_size, d_embed, n_negative, l
                     val_lhs_repr, val_candidate_rhs_repr = model(val_lhs, val_candidate_rhs.view(val_batch.batch_size * n_rhs))  # B x dim, (B * n_output) x dim
                     val_candidate_rhs_repr = val_candidate_rhs_repr.view(val_batch.batch_size, n_rhs, -1)  # B x n_output x dim
                     similarity = model.similarity(val_lhs_repr, val_candidate_rhs_repr).squeeze(1)  # B x n_output
-                    n_val_correct += (torch.max(similarity, dim=-1)[1].view(rhs.size()).data == rhs.data).sum()
+                    n_val_correct += (torch.max(similarity, dim=-1)[1].view(val_rhs.size()).data == val_rhs.data).sum()
                 val_acc = 100. * n_val_correct / len(validation)
 
                 # log progress, including validation metrics
-                logger.log(('time', time.time()-start), ('epoch', epoch), ('iterations', iterations),
-                           ('loss', loss.data[0]), ('accuracy', 100. * n_correct/n_total),
-                           ('val_accuracy', val_acc))
+                logger.log(time=time.time()-start, epoch=epoch, iterations=iterations,
+                           loss=loss.data[0], accuracy=(100. * n_correct/n_total),
+                           val_accuracy=val_acc)
 
                 # update best valiation set accuracy
                 if val_acc > best_val_acc:
@@ -195,8 +188,8 @@ def train(train_file, dataset_format, epochs, batch_size, d_embed, n_negative, l
 
             elif iterations % log_every == 0:
                 # log training progress
-                logger.log(('time', time.time()-start), ('epoch', epoch), ('iterations', iterations),
-                           ('loss', loss.data[0]), ('accuracy', 100. * n_correct/n_total))
+                logger.log(time=time.time()-start, epoch=epoch, iterations=iterations,
+                           loss=loss.data[0], accuracy=(100. * n_correct/n_total))
 
     #model.eval()
     # calculate accuracy on test set
