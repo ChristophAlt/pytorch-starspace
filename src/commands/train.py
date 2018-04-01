@@ -20,7 +20,7 @@ def get_batch_attribs(lhs_attr_name, rhs_attr_name):
         return getattr(batch, lhs_attr_name), getattr(batch, rhs_attr_name)
     return func
 
-      
+
 def get_dataset_fields_extractor(path, dataset_format):
     if dataset_format == 'ag_news':
         lhs_field = data.Field(batch_first=True, sequential=True, include_lengths=False, unk_token=None)
