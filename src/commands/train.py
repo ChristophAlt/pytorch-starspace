@@ -15,7 +15,7 @@ from src.utils import train_validation_split, makedirs, create_fields, \
 
 @click.command()
 @click.option('--train-file', type=click.Path(exists=True), required=True)
-@click.option('--model-path', type=click.Path(), required=True)
+@click.option('--model-path', type=click.Path(exists=False), required=True)
 @click.option('--dataset_format', type=click.Choice(['ag_news']), default=None)
 @click.option('--validation_split', type=float, default=0.1)
 @click.option('--epochs', type=int, default=10)
@@ -69,7 +69,7 @@ def train(train_file, model_path, dataset_format, epochs, batch_size, d_embed, n
 
     logger = TableLogger(['time', 'epoch', 'iterations', 'loss', 'accuracy', 'val_accuracy'])
     
-    makedirs(save_path)
+    makedirs(model_path)
     
     iterations = 0
     start = time.time()
@@ -148,19 +148,19 @@ def train(train_file, model_path, dataset_format, epochs, batch_size, d_embed, n
                 if val_acc > best_val_acc:
                     best_val_acc = val_acc
 
-                    snapshot_prefix = os.path.join(model_path, 'best_snapshot')
-                    path_prefix = snapshot_prefix + '_valacc_{}__iter_{}_'.format(val_acc, iterations)
-                    snapshot_path = path_prefix + 'model.pt'
+                    #snapshot_prefix = os.path.join(model_path, 'best_snapshot')
+                    #path_prefix = snapshot_prefix + '_valacc_{}__iter_{}_'.format(val_acc, iterations)
+                    #snapshot_path = path_prefix + 'model.pt'
 
                     # save model, delete previous 'best_snapshot' files
-                    torch.save(model, snapshot_path)
-                    for f in glob.glob(snapshot_prefix + '*'):
-                        if f != snapshot_path:
-                            os.remove(f)
+                    torch.save(model, os.path.join(model_path, 'model.pt'))
+                    #for f in glob.glob(snapshot_prefix + '*'):
+                    #    if f != snapshot_path:
+                    #        os.remove(f)
 
                     # save vocabulary for both entity fields
-                    save_vocab(lhs_field, path_prefix + 'lhs_vocab.pkl')
-                    save_vocab(rhs_field, path_prefix + 'rhs_vocab.pkl')
+                    save_vocab(lhs_field, os.path.join(model_path, 'lhs_vocab.pkl'))
+                    save_vocab(rhs_field, os.path.join(model_path, 'rhs_vocab.pkl'))
 
             elif iterations % log_every == 0:
                 # log training progress
