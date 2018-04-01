@@ -1,7 +1,9 @@
 import click
 import torch
 
-from src.utils import get_fields
+from torchtext import data
+
+from src.utils import get_fields, deserialize_field_vocabs, get_dataset_extractor
 
 
 @click.command()
@@ -9,7 +11,8 @@ from src.utils import get_fields
 @click.option('--test-file', type=click.Path(exists=True), required=True)
 @click.option('--dataset_format', type=click.Choice(['ag_news']), default=None)
 @click.option('--gpu', type=int, default=0)
-def test(model_path, dataset_format, test_file, gpu):
+@click.option('--batch_size', type=int, default=64)
+def test(model_path, dataset_format, test_file, gpu, batch_size):
     lhs_field, rhs_field = get_fields(dataset_format)
     lhs_vocab, rhs_vocab = deserialize_field_vocabs(model_path)
 
@@ -33,7 +36,7 @@ def test(model_path, dataset_format, test_file, gpu):
         test_candidate_rhs = torch.autograd.Variable(torch.arange(0, n_rhs).long().expand(test_batch.batch_size, -1)) # B x n_output
         if test_lhs.is_cuda:
             test_candidate_rhs = test_candidate_rhs.cuda()
-        lhs_repr, test_candidate_rhs_repr = model(test_lhs, test_candidate_rhs.view(test_batch.batch_size * n_rhs))  # B x dim, (B * n_output) x dim
+        test_lhs_repr, test_candidate_rhs_repr = model(test_lhs, test_candidate_rhs.view(test_batch.batch_size * n_rhs))  # B x dim, (B * n_output) x dim
         test_candidate_rhs_repr = test_candidate_rhs_repr.view(test_batch.batch_size, n_rhs, -1)  # B x n_output x dim
         similarity = model.similarity(test_lhs_repr, test_candidate_rhs_repr).squeeze(1)  # B x n_output
         n_test_correct += (torch.max(similarity, dim=-1)[1].view(test_rhs.size()).data == test_rhs.data).sum()
