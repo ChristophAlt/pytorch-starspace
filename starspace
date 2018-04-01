@@ -2,8 +2,8 @@
 
 import click
 
-from src.commands.train import train
-from src.commands.test import test
+from src.commands import train
+from src.commands import test
 
 
 @click.group()

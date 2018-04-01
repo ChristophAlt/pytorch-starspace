@@ -3,7 +3,7 @@ import torch
 
 from torchtext import data
 
-from src.utils import get_fields, deserialize_field_vocabs, get_dataset_extractor
+from src.utils import create_fields, load_vocab, get_dataset_and_extractor
 
 
 @click.command()
@@ -13,13 +13,12 @@ from src.utils import get_fields, deserialize_field_vocabs, get_dataset_extracto
 @click.option('--gpu', type=int, default=0)
 @click.option('--batch_size', type=int, default=64)
 def test(model_path, dataset_format, test_file, gpu, batch_size):
-    lhs_field, rhs_field = get_fields(dataset_format)
-    lhs_vocab, rhs_vocab = deserialize_field_vocabs(model_path)
+    path_prefix = model_path.find('model.pt')
+    lhs_field, rhs_field = create_fields(dataset_format)
+    lhs_field.vocab = load_vocab(path_prefix * 'lhs_vocab.pkl')
+    rhs_field.vocab = load_vocab(path_prefix * 'rhs_vocab.pkl')
 
-    lhs_field.vocab = lhs_vocab
-    rhs_field.vocab = rhs_vocab
-
-    test, extractor_func = get_dataset_extractor(test_file, dataset_format, lhs_field, rhs_field)
+    test, batch_extractor = get_dataset_and_extractor(test_file, dataset_format, lhs_field, rhs_field)
 
     test_iter = data.BucketIterator(test, batch_size=batch_size, device=gpu, train=False)
 
@@ -30,8 +29,8 @@ def test(model_path, dataset_format, test_file, gpu, batch_size):
     model.eval()
     # calculate accuracy on test set
     n_test_correct = 0
-    for test_batch_idx, test_batch in enumerate(test_iter):
-        test_lhs, test_rhs = extractor_func(test_batch)
+    for test_batch in test_iter:
+        test_lhs, test_rhs = batch_extractor(test_batch)
 
         test_candidate_rhs = torch.autograd.Variable(torch.arange(0, n_rhs).long().expand(test_batch.batch_size, -1)) # B x n_output
         if test_lhs.is_cuda:
