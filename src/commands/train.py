@@ -175,17 +175,3 @@ def train(train_file, dataset_format, epochs, batch_size, d_embed, n_negative, l
                 # log training progress
                 logger.log(time=time.time()-start, epoch=epoch, iterations=iterations,
                            loss=loss.data[0], accuracy=(100. * n_correct/n_total))
-
-    #model.eval()
-    # calculate accuracy on test set
-    #n_test_correct = 0
-    #for test_batch_idx, test_batch in enumerate(test_iter):
-    #    output = torch.autograd.Variable(torch.arange(0, len(LABEL.vocab)).long().expand(test_batch.batch_size, -1)) # B x n_output
-    #    if test_batch.text.is_cuda:
-    #        output = output.cuda()
-    #    input_repr, output_repr = model(test_batch.text, output.view(test_batch.batch_size * len(LABEL.vocab)))  # B x dim, (B * n_output) x dim
-    #    output_repr = output_repr.view(test_batch.batch_size, len(LABEL.vocab), -1)  # B x n_output x dim
-    #    similarity = model.similarity(input_repr, output_repr).squeeze(1)  # B x n_output
-    #    n_test_correct += (torch.max(similarity, dim=-1)[1].view(test_batch.label.size()).data == test_batch.label.data).sum()
-    #test_acc = 100. * n_test_correct / len(test)
-    #print('Accuracy on test set: {:12.4f}'.format(test_acc))
