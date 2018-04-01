@@ -10,27 +10,9 @@ from torchtext import data
 from src.model import StarSpace, InnerProductSimilarity, MarginRankingLoss
 from src.sampling import NegativeSampling
 from src.logging import TableLogger
-from src.utils import train_validation_split, makedirs
+from src.utils import train_validation_split, makedirs, get_fields, get_dataset_extractor, serialize_fields
 
 from datasets.ag_news_corpus import AGNewsCorpus
-
-
-def get_batch_attribs(lhs_attr_name, rhs_attr_name):
-    def func(batch):
-        return getattr(batch, lhs_attr_name), getattr(batch, rhs_attr_name)
-    return func
-
-
-def get_dataset_fields_extractor(path, dataset_format):
-    if dataset_format == 'ag_news':
-        lhs_field = data.Field(batch_first=True, sequential=True, include_lengths=False, unk_token=None)
-        rhs_field = data.Field(sequential=False, unk_token=None)
-        dataset = AGNewsCorpus(path, text_field=lhs_field, label_field=rhs_field)
-        extractor_func = get_batch_attribs('text', 'label')
-    else:
-        raise NotImplementedError("Dataset format '%s' not supported yet!" % dataset_format)
-
-    return dataset, lhs_field, rhs_field, extractor_func
 
 
 @click.command()
@@ -52,7 +34,8 @@ def train(train_file, dataset_format, epochs, batch_size, d_embed, n_negative, l
 
     torch.cuda.device(gpu)
 
-    train_dataset, lhs_field, rhs_field, extractor_func = get_dataset_fields_extractor(train_file, dataset_format)
+    lhs_field, rhs_field = get_fields(dataset_format)
+    train_dataset, extractor_func = get_dataset_extractor(train_file, dataset_format, lhs_field, rhs_field)
 
     train, validation = train_validation_split(train_dataset, train_size=(1. - validation_split))
 
@@ -185,6 +168,8 @@ def train(train_file, dataset_format, epochs, batch_size, d_embed, n_negative, l
                     for f in glob.glob(snapshot_prefix + '*'):
                         if f != snapshot_path:
                             os.remove(f)
+
+                    serialize_fields(snapshot_path, lhs_field, rhs_field)
 
             elif iterations % log_every == 0:
                 # log training progress
