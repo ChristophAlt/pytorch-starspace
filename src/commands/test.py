@@ -7,8 +7,8 @@ from src.utils import create_fields, load_vocab, get_dataset_and_extractor
 
 
 @click.command()
-@click.option('--model-path', type=click.Path(exists=True), required=True)
 @click.option('--test-file', type=click.Path(exists=True), required=True)
+@click.option('--model-path', type=click.Path(exists=True), required=True)
 @click.option('--dataset_format', type=click.Choice(['ag_news']), default=None)
 @click.option('--gpu', type=int, default=0)
 @click.option('--batch_size', type=int, default=64)
