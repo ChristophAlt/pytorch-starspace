@@ -4,15 +4,13 @@ import glob
 import torch
 import click
 
-from pathlib import Path
 from torchtext import data
 
 from src.model import StarSpace, InnerProductSimilarity, MarginRankingLoss
 from src.sampling import NegativeSampling
 from src.logging import TableLogger
-from src.utils import train_validation_split, makedirs, get_fields, get_dataset_extractor, serialize_fields
-
-from datasets.ag_news_corpus import AGNewsCorpus
+from src.utils import train_validation_split, makedirs, create_fields, \
+    get_dataset_and_extractor, save_vocab
 
 
 @click.command()
@@ -34,10 +32,10 @@ def train(train_file, dataset_format, epochs, batch_size, d_embed, n_negative, l
 
     torch.cuda.device(gpu)
 
-    lhs_field, rhs_field = get_fields(dataset_format)
-    train_dataset, extractor_func = get_dataset_extractor(train_file, dataset_format, lhs_field, rhs_field)
+    lhs_field, rhs_field = create_fields(dataset_format)
+    train_dataset, batch_extractor = get_dataset_and_extractor(train_file, dataset_format, lhs_field, rhs_field)
 
-    train, validation = train_validation_split(train_dataset, train_size=(1. - validation_split))
+    train, validation = train_validation_split(train_dataset, validation_size=validation_split)
 
     print('Num entity pairs train:', len(train))
     print('Num entity pairs validation:', len(validation))
@@ -52,8 +50,9 @@ def train(train_file, dataset_format, epochs, batch_size, d_embed, n_negative, l
     print('Num RHS features:', n_rhs)
 
     train_iter, val_iter = data.BucketIterator.splits(
-            (train, validation), batch_size=batch_size, device=gpu)
+        (train, validation), batch_size=batch_size, device=gpu)
 
+    # TODO: implement loading from snapshot
     model = StarSpace(
         d_embed=d_embed,
         n_input=n_lhs,
@@ -62,7 +61,6 @@ def train(train_file, dataset_format, epochs, batch_size, d_embed, n_negative, l
         max_norm=20,
         aggregate=torch.sum)
 
-    # TODO: implement loading from snapshot
     model.cuda()
 
     neg_sampling = NegativeSampling(n_output=n_rhs, n_negative=n_negative)
@@ -70,7 +68,7 @@ def train(train_file, dataset_format, epochs, batch_size, d_embed, n_negative, l
     criterion = MarginRankingLoss(margin=1., aggregate=torch.mean)
     opt = torch.optim.Adam(model.parameters(), lr=lr)
 
-    logger = TableLogger(headers=['time', 'epoch', 'iterations', 'loss', 'accuracy', 'val_accuracy'])
+    logger = TableLogger(['time', 'epoch', 'iterations', 'loss', 'accuracy', 'val_accuracy'])
     
     makedirs(save_path)
     
@@ -81,7 +79,7 @@ def train(train_file, dataset_format, epochs, batch_size, d_embed, n_negative, l
 
     for epoch in range(epochs):
         n_correct, n_total = 0, 0
-        for batch_idx, batch in enumerate(train_iter):
+        for batch in train_iter:
             
             model.train(); opt.zero_grad()
 
@@ -92,9 +90,10 @@ def train(train_file, dataset_format, epochs, batch_size, d_embed, n_negative, l
             # TODO: add correctness/accuracy function for different tasks
             # TODO: clean up accuracy computation
             
-            # get similarity for positive entity pairs
-            lhs, rhs = extractor_func(batch)
+            # extract entity pairs from batch
+            lhs, rhs = batch_extractor(batch)
 
+            # get similarity for positive entity pairs
             lhs_repr, pos_rhs_repr = model(lhs, rhs)  # B x dim, B x dim
             positive_similarity = model.similarity(lhs_repr, pos_rhs_repr).squeeze(1)  # B x 1
 
@@ -139,7 +138,7 @@ def train(train_file, dataset_format, epochs, batch_size, d_embed, n_negative, l
                 # calculate accuracy on validation set
                 n_val_correct = 0
                 for val_batch_idx, val_batch in enumerate(val_iter):
-                    val_lhs, val_rhs = extractor_func(val_batch)
+                    val_lhs, val_rhs = batch_extractor(val_batch)
 
                     val_candidate_rhs = torch.autograd.Variable(torch.arange(0, n_rhs).long().expand(val_batch.batch_size, -1)) # B x n_output
                     if val_lhs.is_cuda:
@@ -155,13 +154,13 @@ def train(train_file, dataset_format, epochs, batch_size, d_embed, n_negative, l
                            loss=loss.data[0], accuracy=(100. * n_correct/n_total),
                            val_accuracy=val_acc)
 
-                # update best valiation set accuracy
+                # found a better model
                 if val_acc > best_val_acc:
-                    # found a model with better validation set accuracy
-
                     best_val_acc = val_acc
+
                     snapshot_prefix = os.path.join(save_path, 'best_snapshot')
-                    snapshot_path = snapshot_prefix + '_valacc_{}__iter_{}_model.pt'.format(val_acc, iterations)
+                    path_prefix = snapshot_prefix + '_valacc_{}__iter_{}_'.format(val_acc, iterations)
+                    snapshot_path = path_prefix + 'model.pt'
 
                     # save model, delete previous 'best_snapshot' files
                     torch.save(model, snapshot_path)
@@ -169,23 +168,11 @@ def train(train_file, dataset_format, epochs, batch_size, d_embed, n_negative, l
                         if f != snapshot_path:
                             os.remove(f)
 
-                    serialize_fields(snapshot_path, lhs_field, rhs_field)
+                    # save vocabulary for both entity fields
+                    save_vocab(lhs_field, path_prefix + 'lhs_vocab.pkl')
+                    save_vocab(rhs_field, path_prefix + 'rhs_vocab.pkl')
 
             elif iterations % log_every == 0:
                 # log training progress
                 logger.log(time=time.time()-start, epoch=epoch, iterations=iterations,
                            loss=loss.data[0], accuracy=(100. * n_correct/n_total))
-
-    #model.eval()
-    # calculate accuracy on test set
-    #n_test_correct = 0
-    #for test_batch_idx, test_batch in enumerate(test_iter):
-    #    output = torch.autograd.Variable(torch.arange(0, len(LABEL.vocab)).long().expand(test_batch.batch_size, -1)) # B x n_output
-    #    if test_batch.text.is_cuda:
-    #        output = output.cuda()
-    #    input_repr, output_repr = model(test_batch.text, output.view(test_batch.batch_size * len(LABEL.vocab)))  # B x dim, (B * n_output) x dim
-    #    output_repr = output_repr.view(test_batch.batch_size, len(LABEL.vocab), -1)  # B x n_output x dim
-    #    similarity = model.similarity(input_repr, output_repr).squeeze(1)  # B x n_output
-    #    n_test_correct += (torch.max(similarity, dim=-1)[1].view(test_batch.label.size()).data == test_batch.label.data).sum()
-    #test_acc = 100. * n_test_correct / len(test)
-    #print('Accuracy on test set: {:12.4f}'.format(test_acc))
