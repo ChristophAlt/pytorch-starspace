@@ -6,9 +6,11 @@ import torch
 from pathlib import Path
 from torchtext import data
 
-from model import StarSpace, NegativeSampling, InnerProductSimilarity, MarginRankingLoss
-from ag_news_corpus import AGNewsCorpus
-from utils import TableLogger, get_args, train_validation_split, makedirs
+from starspace.model import StarSpace, InnerProductSimilarity, MarginRankingLoss
+from starspace.sampling import NegativeSampling
+from starspace.utils import TableLogger, get_args, train_validation_split, makedirs
+
+from datasets.ag_news_corpus import AGNewsCorpus
 
 
 TORCHTEXT_DIR = os.path.join(str(Path.home()), '.torchtext')
@@ -22,9 +24,8 @@ def main():
 
     torch.cuda.set_device(args.gpu)
 
-    TEXT = data.Field(batch_first=True, include_lengths=False,
-                  tokenize='spacy')
-    LABEL = data.Field(sequential=False, unk_token=None)
+    TEXT = data.Field(batch_first=True, sequential=True, include_lengths=False, unk_token=None)
+    LABEL = data.Field(batch_first=True, sequential=True, include_lengths=False, unk_token=None)
 
     train_validation, test = AGNewsCorpus.splits(
         root=os.path.join(TORCHTEXT_DIR, 'data'),
@@ -73,7 +74,7 @@ def main():
     for epoch in range(args.epochs):
         n_correct, n_total = 0, 0
         for batch_idx, batch in enumerate(train_iter):
-
+            
             model.train(); opt.zero_grad()
 
             iterations += 1
@@ -176,4 +177,7 @@ def main():
     print('Accuracy on test set: {:12.4f}'.format(test_acc))
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        pass
