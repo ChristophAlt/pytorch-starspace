@@ -13,10 +13,10 @@ from src.utils import create_fields, load_vocab, get_dataset_and_extractor
 @click.option('--gpu', type=int, default=0)
 @click.option('--batch_size', type=int, default=64)
 def test(model_path, dataset_format, test_file, gpu, batch_size):
-    path_prefix = model_path.find('model.pt')
+    path_prefix = model_path[:model_path.find('model.pt')]
     lhs_field, rhs_field = create_fields(dataset_format)
-    lhs_field.vocab = load_vocab(path_prefix * 'lhs_vocab.pkl')
-    rhs_field.vocab = load_vocab(path_prefix * 'rhs_vocab.pkl')
+    lhs_field.vocab = load_vocab(path_prefix + 'lhs_vocab.pkl')
+    rhs_field.vocab = load_vocab(path_prefix + 'rhs_vocab.pkl')
 
     test, batch_extractor = get_dataset_and_extractor(test_file, dataset_format, lhs_field, rhs_field)
 

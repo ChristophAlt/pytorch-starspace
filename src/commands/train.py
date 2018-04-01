@@ -138,7 +138,7 @@ def train(train_file, dataset_format, epochs, batch_size, d_embed, n_negative, l
                 # calculate accuracy on validation set
                 n_val_correct = 0
                 for val_batch_idx, val_batch in enumerate(val_iter):
-                    val_lhs, val_rhs = extractor_func(val_batch)
+                    val_lhs, val_rhs = batch_extractor(val_batch)
 
                     val_candidate_rhs = torch.autograd.Variable(torch.arange(0, n_rhs).long().expand(val_batch.batch_size, -1)) # B x n_output
                     if val_lhs.is_cuda:
