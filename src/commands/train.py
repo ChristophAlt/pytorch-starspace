@@ -2,27 +2,33 @@ import os
 import time
 import glob
 import torch
+import click
 
 from pathlib import Path
 from torchtext import data
 
-from starspace.model import StarSpace, InnerProductSimilarity, MarginRankingLoss
-from starspace.sampling import NegativeSampling
-from starspace.utils import TableLogger, get_args, train_validation_split, makedirs
+from src.model import StarSpace, InnerProductSimilarity, MarginRankingLoss
+from src.sampling import NegativeSampling
+from src.utils import TableLogger, train_validation_split, makedirs
 
 from datasets.ag_news_corpus import AGNewsCorpus
 
+      
+@click.command()
+@click.option('--epochs', type=int, default=10)
+@click.option('--batch_size', type=int, default=64)
+@click.option('--d_embed', type=int, default=100)
+@click.option('--n_negative', type=int, default=5)
+@click.option('--log_every', type=int, default=50)
+@click.option('--lr', type=float, default=1e-3)
+@click.option('--val_every', type=int, default=1000)
+@click.option('--save_every', type=int, default=1000)
+@click.option('--gpu', type=int, default=0)
+@click.option('--save_path', type=str, default='results')
+def train(epochs, batch_size, d_embed, n_negative, log_every, lr, val_every, save_every, gpu, save_path):
+    #print('Configuration:')
 
-TORCHTEXT_DIR = os.path.join(str(Path.home()), '.torchtext')
-        
-
-def main():
-    args = get_args()
-
-    print('Configuration:')
-    print(vars(args))
-
-    torch.cuda.set_device(args.gpu)
+    torch.cuda.set_device(gpu)
 
     TEXT = data.Field(batch_first=True, sequential=True, include_lengths=False, unk_token=None)
     LABEL = data.Field(batch_first=True, sequential=True, include_lengths=False, unk_token=None)
@@ -44,10 +50,10 @@ def main():
     print('Vocab size LABEL:', len(LABEL.vocab))
 
     train_iter, val_iter, test_iter = data.BucketIterator.splits(
-            (train, validation, test), batch_size=args.batch_size, device=args.gpu)
+            (train, validation, test), batch_size=batch_size, device=gpu)
 
     model = StarSpace(
-        d_embed=args.d_embed,
+        d_embed=d_embed,
         n_input=len(TEXT.vocab),
         n_output=len(LABEL.vocab),
         similarity=InnerProductSimilarity(),
@@ -57,21 +63,21 @@ def main():
     # TODO: implement loading from snapshot
     model.cuda()
 
-    neg_sampling = NegativeSampling(n_output=len(LABEL.vocab), n_negative=args.n_negative)
+    neg_sampling = NegativeSampling(n_output=len(LABEL.vocab), n_negative=n_negative)
 
     criterion = MarginRankingLoss(margin=1., aggregate=torch.mean)
-    opt = torch.optim.Adam(model.parameters(), lr=args.lr)
+    opt = torch.optim.Adam(model.parameters(), lr=lr)
 
     logger = TableLogger(headers=['time', 'epoch', 'iterations', 'loss', 'accuracy', 'val_accuracy'])
     
-    makedirs(args.save_path)
+    makedirs(save_path)
     
     iterations = 0
     start = time.time()
     train_iter.repeat = False
     best_val_acc = -1
 
-    for epoch in range(args.epochs):
+    for epoch in range(epochs):
         n_correct, n_total = 0, 0
         for batch_idx, batch in enumerate(train_iter):
             
@@ -89,12 +95,12 @@ def main():
             positive_similarity = model.similarity(input_repr, pos_output_repr).squeeze(1)  # B x 1
 
             # get similarity for negative entity pairs
-            n_samples = batch.batch_size * args.n_negative
+            n_samples = batch.batch_size * n_negative
             neg_output = neg_sampling.sample(n_samples)
             if batch.text.is_cuda:
                 neg_output = neg_output.cuda()
             _, neg_output_repr = model(output=neg_output)  # (B * n_negative) x dim
-            neg_output_repr = neg_output_repr.view(batch.batch_size, args.n_negative, -1)  # B x n_negative x dim
+            neg_output_repr = neg_output_repr.view(batch.batch_size, n_negative, -1)  # B x n_negative x dim
             negative_similarity = model.similarity(input_repr, neg_output_repr).squeeze(1)  # B x n_negative
 
             # calculate accuracy of predictions in the current batch
@@ -114,8 +120,8 @@ def main():
             loss.backward(); opt.step()
 
             # checkpoint model periodically
-            if iterations % args.save_every == 0:
-                snapshot_prefix = os.path.join(args.save_path, 'snapshot')
+            if iterations % save_every == 0:
+                snapshot_prefix = os.path.join(save_path, 'snapshot')
                 snapshot_path = snapshot_prefix + '_acc_{:.4f}_loss_{:.6f}_iter_{}_model.pt'.format(train_acc, loss.data[0], iterations)
                 torch.save(model, snapshot_path)
                 for f in glob.glob(snapshot_prefix + '*'):
@@ -123,7 +129,7 @@ def main():
                         os.remove(f)
 
             # evaluate performance on validation set
-            if iterations % args.val_every == 0:
+            if iterations % val_every == 0:
                 model.eval()
 
                 # calculate accuracy on validation set
@@ -148,7 +154,7 @@ def main():
                     # found a model with better validation set accuracy
 
                     best_val_acc = val_acc
-                    snapshot_prefix = os.path.join(args.save_path, 'best_snapshot')
+                    snapshot_prefix = os.path.join(save_path, 'best_snapshot')
                     snapshot_path = snapshot_prefix + '_valacc_{}__iter_{}_model.pt'.format(val_acc, iterations)
 
                     # save model, delete previous 'best_snapshot' files
@@ -157,7 +163,7 @@ def main():
                         if f != snapshot_path:
                             os.remove(f)
 
-            elif iterations % args.log_every == 0:
+            elif iterations % log_every == 0:
                 # log training progress
                 logger.log(('time', time.time()-start), ('epoch', epoch), ('iterations', iterations),
                            ('loss', loss.data[0]), ('accuracy', 100. * n_correct/n_total))

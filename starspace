@@ -1,0 +1,16 @@
+#!/usr/bin/env python
+
+import click
+
+from src.commands.train import train
+
+
+@click.group()
+def cli():
+    pass
+
+cli.add_command(train)
+
+
+if __name__ == '__main__':
+    cli()

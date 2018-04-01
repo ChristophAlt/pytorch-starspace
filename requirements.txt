@@ -1,5 +1,5 @@
 torchtext
 numpy
-spacy
 six
 tabulate
+click
