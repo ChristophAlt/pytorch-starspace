@@ -1,3 +1,4 @@
+import os
 import click
 import torch
 
@@ -7,16 +8,19 @@ from src.utils import create_fields, load_vocab, get_dataset_and_extractor
 
 
 @click.command()
-@click.option('--model-path', type=click.Path(exists=True), required=True)
 @click.option('--test-file', type=click.Path(exists=True), required=True)
+@click.option('--model-path', type=click.Path(exists=True), required=True)
 @click.option('--dataset_format', type=click.Choice(['ag_news']), default=None)
 @click.option('--gpu', type=int, default=0)
 @click.option('--batch_size', type=int, default=64)
 def test(model_path, dataset_format, test_file, gpu, batch_size):
-    path_prefix = model_path[:model_path.find('model.pt')]
+    model_file = os.path.join(model_path, 'model.pt')
+    lhs_vocab_file = os.path.join(model_path, 'lhs_vocab.pkl')
+    rhs_vocab_file = os.path.join(model_path, 'rhs_vocab.pkl')
+
     lhs_field, rhs_field = create_fields(dataset_format)
-    lhs_field.vocab = load_vocab(path_prefix + 'lhs_vocab.pkl')
-    rhs_field.vocab = load_vocab(path_prefix + 'rhs_vocab.pkl')
+    lhs_field.vocab = load_vocab(lhs_vocab_file)
+    rhs_field.vocab = load_vocab(rhs_vocab_file)
 
     test, batch_extractor = get_dataset_and_extractor(test_file, dataset_format, lhs_field, rhs_field)
 
@@ -24,7 +28,7 @@ def test(model_path, dataset_format, test_file, gpu, batch_size):
 
     n_rhs = len(rhs_field.vocab)
 
-    model = torch.load(model_path, map_location=lambda storage, locatoin: storage.cuda(gpu))
+    model = torch.load(model_file, map_location=lambda storage, locatoin: storage.cuda(gpu))
 
     model.eval()
     # calculate accuracy on test set

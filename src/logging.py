@@ -2,7 +2,7 @@ from tabulate import tabulate
 
 
 class TableLogger(object):
-    def __init__(self, headers, tablefmt='simple', floatfmt='.4f'):
+    def __init__(self, headers, tablefmt='simple', floatfmt='.2f'):
         self.headers = headers
         self.header_logged = False
         self.tabular_data = []
