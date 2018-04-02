@@ -10,19 +10,20 @@ from src.utils import create_fields, load_vocab, get_dataset_and_extractor
 @click.command()
 @click.option('--test-file', type=click.Path(exists=True), required=True)
 @click.option('--model-path', type=click.Path(exists=True), required=True)
-@click.option('--dataset_format', type=click.Choice(['ag_news']), default=None)
+@click.option('--file-format', type=click.Choice(['fast_text', 'ag_news']), default='fast_text')
+@click.option('--train-mode', type=int, default=0)
 @click.option('--gpu', type=int, default=0)
-@click.option('--batch_size', type=int, default=64)
-def test(model_path, dataset_format, test_file, gpu, batch_size):
+@click.option('--batch-size', type=int, default=64)
+def test(model_path, file_format, test_file, train_mode, gpu, batch_size):
     model_file = os.path.join(model_path, 'model.pt')
     lhs_vocab_file = os.path.join(model_path, 'lhs_vocab.pkl')
     rhs_vocab_file = os.path.join(model_path, 'rhs_vocab.pkl')
 
-    lhs_field, rhs_field = create_fields(dataset_format)
+    lhs_field, rhs_field = create_fields(train_mode)
     lhs_field.vocab = load_vocab(lhs_vocab_file)
     rhs_field.vocab = load_vocab(rhs_vocab_file)
 
-    test, batch_extractor = get_dataset_and_extractor(test_file, dataset_format, lhs_field, rhs_field)
+    test, batch_extractor = get_dataset_and_extractor(test_file, file_format, lhs_field, rhs_field)
 
     test_iter = data.BucketIterator(test, batch_size=batch_size, device=gpu, train=False)
 

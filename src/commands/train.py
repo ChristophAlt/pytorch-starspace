@@ -16,7 +16,7 @@ from src.utils import train_validation_split, makedirs, create_fields, \
 @click.command()
 @click.option('--train-file', type=click.Path(exists=True), required=True)
 @click.option('--model-path', type=click.Path(exists=False), required=True)
-@click.option('--file-format', type=click.Choice(['fast_text', 'ag_news']), default=None)
+@click.option('--file-format', type=click.Choice(['fast_text', 'ag_news']), default='fast_text')
 @click.option('--train-mode', type=int, default=0)
 @click.option('--validation_split', type=float, default=0.1)
 @click.option('--epochs', type=int, default=10)
