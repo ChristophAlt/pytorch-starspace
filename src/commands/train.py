@@ -16,23 +16,24 @@ from src.utils import train_validation_split, makedirs, create_fields, \
 @click.command()
 @click.option('--train-file', type=click.Path(exists=True), required=True)
 @click.option('--model-path', type=click.Path(exists=False), required=True)
-@click.option('--dataset_format', type=click.Choice(['ag_news']), default=None)
+@click.option('--file-format', type=click.Choice(['fast_text', 'ag_news']), default=None)
+@click.option('--train-mode', type=int, default=0)
 @click.option('--validation_split', type=float, default=0.1)
 @click.option('--epochs', type=int, default=10)
 @click.option('--batch_size', type=int, default=64)
-@click.option('--d_embed', type=int, default=100)
+@click.option('--d-embed', type=int, default=100)
 @click.option('--n_negative', type=int, default=5)
 @click.option('--log_every', type=int, default=50)
 @click.option('--lr', type=float, default=1e-3)
-@click.option('--val_every', type=int, default=1000)
+@click.option('--val-every', type=int, default=1000)
 @click.option('--gpu', type=int, default=0)
-def train(train_file, model_path, dataset_format, epochs, batch_size, d_embed, n_negative, log_every, lr, val_every, gpu, validation_split):
+def train(train_file, model_path, file_format, train_mode, epochs, batch_size, d_embed, n_negative, log_every, lr, val_every, gpu, validation_split):
     #print('Configuration:')
 
     torch.cuda.device(gpu)
 
-    lhs_field, rhs_field = create_fields(dataset_format)
-    train_dataset, batch_extractor = get_dataset_and_extractor(train_file, dataset_format, lhs_field, rhs_field)
+    lhs_field, rhs_field = create_fields(train_mode)
+    train_dataset, batch_extractor = get_dataset_and_extractor(train_file, file_format, lhs_field, rhs_field)
 
     train, validation = train_validation_split(train_dataset, validation_size=validation_split)
 
@@ -67,7 +68,8 @@ def train(train_file, model_path, dataset_format, epochs, batch_size, d_embed, n
     criterion = MarginRankingLoss(margin=1., aggregate=torch.mean)
     opt = torch.optim.Adam(model.parameters(), lr=lr)
 
-    logger = TableLogger(['time', 'epoch', 'iterations', 'loss', 'accuracy', 'val_accuracy'])
+    logger = TableLogger(
+        headers=['time', 'epoch', 'iterations', 'loss', 'accuracy', 'val_accuracy'])
     
     makedirs(model_path)
     
@@ -148,15 +150,8 @@ def train(train_file, model_path, dataset_format, epochs, batch_size, d_embed, n
                 if val_acc > best_val_acc:
                     best_val_acc = val_acc
 
-                    #snapshot_prefix = os.path.join(model_path, 'best_snapshot')
-                    #path_prefix = snapshot_prefix + '_valacc_{}__iter_{}_'.format(val_acc, iterations)
-                    #snapshot_path = path_prefix + 'model.pt'
-
-                    # save model, delete previous 'best_snapshot' files
+                    # save model
                     torch.save(model, os.path.join(model_path, 'model.pt'))
-                    #for f in glob.glob(snapshot_prefix + '*'):
-                    #    if f != snapshot_path:
-                    #        os.remove(f)
 
                     # save vocabulary for both entity fields
                     save_vocab(lhs_field, os.path.join(model_path, 'lhs_vocab.pkl'))

@@ -21,8 +21,8 @@ echo "Start training on AG news dataset"
 ./starspace train \
   --train-file "${DATADIR}/${DATASET}_csv/train.csv" \
   --model-path "${MODELDIR}/${DATASET}" \
-  --dataset_format ${DATASET} \
-  --d_embed=10 \
+  --file-format ${DATASET} \
+  --d-embed=10 \
   --lr=0.01 \
   --epochs=5
 
@@ -31,4 +31,4 @@ echo "Evaluate trained model"
 ./starspace test \
   --test-file "${DATADIR}/${DATASET}_csv/test.csv" \
   --model-path "${MODELDIR}/${DATASET}" \
-  --dataset_format ${DATASET}
+  --file-format ${DATASET}

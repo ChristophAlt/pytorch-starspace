@@ -82,9 +82,11 @@ def create_batch_extractor(lhs_name, rhs_name):
     return func
 
 
-def create_fields(dataset_format):
+def create_fields(train_mode):
     """Creates torchtext fields for the two entitites required in StarSpace, 
-    according to the given dataset format.
+    according to the given train mode.
+
+    Train mode 0: Each example contains both input and labels. 
 
     Args:
         dataset_format (str): The format of the dataset or a specific dataset.
@@ -96,13 +98,12 @@ def create_fields(dataset_format):
         ValueError: If unknown dataset_format is passed.
 
     """
-    dataset_format = dataset_format.lower()
 
-    if dataset_format == 'ag_news':
-        lhs_field = data.Field(batch_first=True, sequential=True, include_lengths=False, unk_token=None)
-        rhs_field = data.Field(sequential=False, unk_token=None)
+    if train_mode == 0:
+        lhs_field = data.Field(batch_first=True, sequential=True, include_lengths=False)
+        rhs_field = data.Field(sequential=False)
     else:
-        raise ValueError("Dataset format '%s' not supported yet!" % dataset_format)
+        raise ValueError("Train mode '%s' not supported yet!" % train_mode)
 
     return lhs_field, rhs_field
 
