@@ -7,6 +7,16 @@ Ledell Wu, Adam Fisch, Sumit Chopra, Keith Adams, Antoine Bordes and Jason Westo
 
 The C++ version maintained and developed by the authors can be found [here](https://github.com/facebookresearch/StarSpace).
 
+
+## Installation
+Tested on Pyton 3.6.1 and PyTorch 0.3.1
+
+
+- Install PyTorch via [conda or pip](http://pytorch.org)
+- Install dependencies  
+`$ pip install -r requirements.txt`
+
+
 ## Usage
 The commandline interface resembles the one used by the C++ version.
 
