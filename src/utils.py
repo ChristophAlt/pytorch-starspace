@@ -101,7 +101,7 @@ def create_fields(train_mode):
 
     if train_mode == 0:
         lhs_field = data.Field(batch_first=True, sequential=True, include_lengths=False)
-        rhs_field = data.Field(sequential=False)
+        rhs_field = data.Field(sequential=False, unk_token=None, pad_token=None)
     else:
         raise ValueError("Train mode '%s' not supported yet!" % train_mode)
 
