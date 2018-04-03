@@ -1,4 +1,4 @@
-# Pure PyTorch implementation of StarSpace
+# PyTorch implementation of StarSpace
 
 Based on the approach described in [StarSpace: Embed All The Things! by 
 Ledell Wu, Adam Fisch, Sumit Chopra, Keith Adams, Antoine Bordes and Jason Weston](https://arxiv.org/abs/1709.03856)
