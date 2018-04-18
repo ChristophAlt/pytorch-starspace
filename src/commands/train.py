@@ -61,7 +61,8 @@ def train(train_file, model_path, file_format, train_mode, epochs, batch_size, d
         max_norm=20,
         aggregate=torch.sum)
 
-    model.cuda()
+    if torch.cuda.is_available():
+        model.cuda()
 
     neg_sampling = NegativeSampling(n_output=n_rhs, n_negative=n_negative)
 
@@ -101,7 +102,7 @@ def train(train_file, model_path, file_format, train_mode, epochs, batch_size, d
             # get similarity for negative entity pairs
             n_samples = batch.batch_size * n_negative
             neg_rhs = neg_sampling.sample(n_samples)
-            if lhs.is_cuda:
+            if torch.cuda.is_available():
                 neg_rhs = neg_rhs.cuda()
             _, neg_rhs_repr = model(output=neg_rhs)  # (B * n_negative) x dim
             neg_rhs_repr = neg_rhs_repr.view(batch.batch_size, n_negative, -1)  # B x n_negative x dim
@@ -109,9 +110,9 @@ def train(train_file, model_path, file_format, train_mode, epochs, batch_size, d
 
             # calculate accuracy of predictions in the current batch
             candidate_rhs = torch.autograd.Variable(torch.arange(0, n_rhs).long().expand(batch.batch_size, -1)) # B x n_output
-            if lhs.is_cuda:
+            if torch.cuda.is_available():
                 candidate_rhs = candidate_rhs.cuda()
-            _, candidate_rhs_repr = model(output=candidate_rhs.view(batch.batch_size * n_rhs))  # B x dim, (B * n_output) x dim
+            _, candidate_rhs_repr = model(output=candidate_rhs.contiguous().view(batch.batch_size * n_rhs))  # B x dim, (B * n_output) x dim
             candidate_rhs_repr = candidate_rhs_repr.view(batch.batch_size, n_rhs, -1)  # B x n_output x dim
             similarity = model.similarity(lhs_repr, candidate_rhs_repr).squeeze(1)  # B x n_output
             n_correct += (torch.max(similarity, dim=-1)[1].view(rhs.size()).data == rhs.data).sum()
@@ -133,9 +134,9 @@ def train(train_file, model_path, file_format, train_mode, epochs, batch_size, d
                     val_lhs, val_rhs = batch_extractor(val_batch)
 
                     val_candidate_rhs = torch.autograd.Variable(torch.arange(0, n_rhs).long().expand(val_batch.batch_size, -1)) # B x n_output
-                    if val_lhs.is_cuda:
+                    if torch.cuda.is_available():
                         val_candidate_rhs = val_candidate_rhs.cuda()
-                    val_lhs_repr, val_candidate_rhs_repr = model(val_lhs, val_candidate_rhs.view(val_batch.batch_size * n_rhs))  # B x dim, (B * n_output) x dim
+                    val_lhs_repr, val_candidate_rhs_repr = model(val_lhs, val_candidate_rhs.contiguous().view(val_batch.batch_size * n_rhs))  # B x dim, (B * n_output) x dim
                     val_candidate_rhs_repr = val_candidate_rhs_repr.view(val_batch.batch_size, n_rhs, -1)  # B x n_output x dim
                     similarity = model.similarity(val_lhs_repr, val_candidate_rhs_repr).squeeze(1)  # B x n_output
                     n_val_correct += (torch.max(similarity, dim=-1)[1].view(val_rhs.size()).data == val_rhs.data).sum()
