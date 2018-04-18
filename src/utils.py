@@ -83,7 +83,7 @@ def create_batch_extractor(lhs_name, rhs_name):
 
 
 def create_fields(train_mode):
-    """Creates torchtext fields for the two entitites required in StarSpace, 
+    """Creates torchtext fields for the two entities required in StarSpace,
     according to the given train mode.
 
     Train mode 0: Each example contains both input and labels. 
