@@ -4,6 +4,7 @@ import pickle
 
 from torchtext import data
 from datasets.ag_news_corpus import AGNewsCorpus
+from datasets.fast_text import FastText
 
 
 def makedirs(name):
@@ -108,7 +109,7 @@ def create_fields(train_mode):
     return lhs_field, rhs_field
 
 
-def get_dataset_and_extractor(path, dataset_format, lhs_field, rhs_field):
+def get_dataset_and_extractor(path, dataset_format, lhs_field, rhs_field, label_prefix):
     """Given the path and format of a dataset, read the dataset and create 
     the corresponding batch extractor.
 
@@ -130,10 +131,12 @@ def get_dataset_and_extractor(path, dataset_format, lhs_field, rhs_field):
 
     if dataset_format == 'ag_news':
         dataset = AGNewsCorpus(path, text_field=lhs_field, label_field=rhs_field)
-        extractor = create_batch_extractor(lhs_name='text', rhs_name='label')
+    elif dataset_format == 'fast_text':
+        dataset = FastText(path, text_field=lhs_field, label_field=rhs_field, label_prefix=label_prefix)
     else:
         raise ValueError("Dataset format '%s' not supported yet!" % dataset_format)
 
+    extractor = create_batch_extractor(lhs_name='text', rhs_name='label')
     return dataset, extractor
 
 def save_vocab(field, path):

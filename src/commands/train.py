@@ -18,6 +18,7 @@ from src.utils import train_validation_split, makedirs, create_fields, \
 @click.option('--model-path', type=click.Path(exists=False), required=True)
 @click.option('--file-format', type=click.Choice(['fast_text', 'ag_news']), default='fast_text')
 @click.option('--train-mode', type=int, default=0)
+@click.option('--label', type=str, default='__label__')
 @click.option('--validation_split', type=float, default=0.1)
 @click.option('--epochs', type=int, default=10)
 @click.option('--batch_size', type=int, default=64)
@@ -27,13 +28,14 @@ from src.utils import train_validation_split, makedirs, create_fields, \
 @click.option('--lr', type=float, default=1e-3)
 @click.option('--val-every', type=int, default=1000)
 @click.option('--gpu', type=int, default=0)
-def train(train_file, model_path, file_format, train_mode, epochs, batch_size, d_embed, n_negative, log_every, lr, val_every, gpu, validation_split):
+def train(train_file, model_path, file_format, label, train_mode, epochs, batch_size, d_embed, n_negative, log_every, lr, val_every, gpu, validation_split):
     #print('Configuration:')
 
     torch.cuda.device(gpu)
 
     lhs_field, rhs_field = create_fields(train_mode)
-    train_dataset, batch_extractor = get_dataset_and_extractor(train_file, file_format, lhs_field, rhs_field)
+    train_dataset, batch_extractor = get_dataset_and_extractor(train_file, file_format, lhs_field, rhs_field,
+                                                               label_prefix=label)
 
     train, validation = train_validation_split(train_dataset, validation_size=validation_split)
 
